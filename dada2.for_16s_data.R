@@ -1,26 +1,32 @@
 ####DADA2 16S Amplicon Processing####
-####Please do not modify this file. Instead download a local copy to modify####
+#When running this script it's best to run it interactively in the R environment to be sure each step works as expected
+#there are also points within the protocol where you need to examine some output files to make decisions about quality
+#filtering, trimming, etc. Once you've run through the script and are sure everything is up to snuff you can re-run
+#from the terminal using: Rscript dada2.for_16s_dat.R whenever you need to (e.g., you noticed a mistake and you need to reprocess)
 
 ####CHANGE THESE####
-PATH="/Volumes/histolytica/triatomes/" #CHANGE ME to your working directory
+PATH="/Users/mann/github/triatomes/" #CHANGE ME to your working directory
 RAW="/Volumes/histolytica/triatomes/raw" #CHANGE ME to where your raw fastq files are
-FWPRI="GTGYCAGCMGCCGCGGTAA" #CHANGE ME to your forward primer current is 515F Caparoso primers
-RVPRI="GGACTACNVGGGTWTCTAAT" #CHANGE ME to your reverse primer current is 806R Caparoso primers
+FWPRI="GTGYCAGCMGCCGCGGTAA" #CHANGE ME to your forward primer 
+RVPRI="GGACTACNVGGGTWTCTAAT" #CHANGE ME to your reverse primer 
 CUTAD="/usr/local/bin/cutadapt" #CHANGE ME to your cutadapt install (if you don't know where this is try the following command in your terminal: which cutadapt)
 REFDB="/Users/mann/refDB/silva_for_dada2/v132_for_parfreylab/16s/silva_132.16s.99_rep_set.dada2.fa.gz" #CHANGE ME to your reference database fasta file
 FPAT="_R1_001.fastq.gz" #CHANGE ME to match the pattern in your forward reads
 RVPAT="_R2_001.fastq.gz" #CHANGE ME to match the pattern in your reverse reads
+VSEARCH="/usr/local/bin/vsearch"
+BACTAX="/Users/mann/refDB/ezbiocloud/ezbiocloud_id_taxonomy.txt" #change this to your bacterial reference db taxonomy file
+BACREF="/Users/mann/refDB/ezbiocloud/ezbiocloud_qiime_full.fasta" #change this to your bacterial reference db fasta file
+EUKTAX="/Users/mann/refDB/pr2/pr2_version_4.11.1_mothur.tax" #change this to your eukaryotic reference db taxonomy file
+EUKREF="/Users/mann/refDB/pr2/pr2_version_4.11.1_mothur.fasta" #change this to your eukaryotic reference db fasta file
 #####################
 
 ####Required Libraries####
 library(dada2)
-library(phyloseq)
 library(tidyverse)
 library(reshape2)
 library(stringr)
 library(data.table)
 library(broom)
-library(ape)
 library(qualpalr)
 library(viridis)
 library(ShortRead)
@@ -37,21 +43,21 @@ path <- RAW
 list.files(path)
 fnFs <- sort(list.files(path, pattern=FPAT, full.names = TRUE)) 
 fnRs <- sort(list.files(path, pattern=RVPAT, full.names = TRUE)) 
-sample.names <- sapply(strsplit(basename(fnFs), "_"), `[`, 1) #change the delimiter in quotes and the number at the end of this command to decide how to split up the file name, and which element to extract for a unique sample name
+sample.names <- sapply(strsplit(basename(fnFs), "_"), `[`, 1) #CHANGE the delimiter in quotes and the number at the end of this command to decide how to split up the file name, and which element to extract for a unique sample name
 
 ####fastq Quality Plots####
 # be sure to take a look at these, they should inform your read trimming decisions downstream
-pdf("forward_quality_plot.pdf")
+pdf(paste(PATH,"forward_quality_plot.pdf", sep=""))
 plotQualityProfile(fnFs[1:20]) #this plots the quality profiles for each sample, if you have a lot of samples, it's best to look at just a few of them, the plots take a minute or two to generate even only showing 10-20 samples.
 dev.off()
-pdf("reverse_quality_plot.pdf")
+pdf(paste(PATH,"reverse_quality_plot.pdf",sep=""))
 plotQualityProfile(fnRs[1:20])
 dev.off()
 
 ####Primer Removal####
 ####identify primers####
-FWD <- FWPRI  ## CHANGE ME to your forward primer sequence
-REV <- RVPRI  ## CHANGE ME to your reverse primer sequence
+FWD <- FWPRI  
+REV <- RVPRI  
 allOrients <- function(primer) {
   # Create all orientations of the input sequence
   require(Biostrings)
@@ -117,11 +123,13 @@ filtRs <- file.path(path.cut, "filtered", basename(cutRs))
 
 ####trim & filter####
 #filter and trim command. dada2 can canonically handle lots of errors, I am typically permissive in the maxEE parameter set here, in order to retain the maximum number of reads possible. error correction steps built into the dada2 pipeline have no trouble handling data with this many expected errors.
+#check out the DADA2 tutorial to see what each of the options in the command below do
 out <- filterAndTrim(cutFs, filtFs, cutRs, filtRs, truncLen=c(0,0), minLen = c(150,120),
                      maxN=c(0,0), maxEE=c(8,10), truncQ=c(2,2), rm.phix=TRUE, matchIDs=TRUE,
                      compress=TRUE, multithread=TRUE)
 retained <- as.data.frame(out)
 retained$percentage_retained <- retained$reads.out/retained$reads.in*100
+#check this table, you should retain most of your reads. If you lose a lot you might need to change the filterAndTrim quality thresholds
 View(retained)
 
 ####learn error rates####
@@ -129,7 +137,9 @@ View(retained)
 errF <- learnErrors(filtFs, multithread=TRUE)
 errR <- learnErrors(filtRs, multithread=TRUE)
 
+pdf(paste(PATH, "error_plot.pdf", sep=""))
 plotErrors(errF, nominalQ=TRUE) #assess this graph. it shows the error rates observed in your dataset. strange or unexpected shapes in the plot should be considered before moving on.
+dev.off()
 
 ####dereplication####
 derepFs <- derepFastq(filtFs, verbose=TRUE)
@@ -148,14 +158,15 @@ dadaRs[[1]]
 
 ####OPTIONAL: remove low-sequence samples before merging####
 #a "subscript out of bounds" error at the next step (merging) may indicate that you aren't merging any reads in one or more samples.
-#samples_to_keep <- as.numeric(out[,"reads.out"]) > 100 #example of simple method used above after the filter and trim step. if you already did this but still got an error when merging, try the steps below
+#samples_to_keep <- as.numeric(out[,"reads.out"]) > 500 #example of simple method used above after the filter and trim step. if you already did this but still got an error when merging, try the steps below
 getN <- function(x) sum(getUniques(x)) #keeping track of read retention, number of unique sequences after ASV inference
 track <- cbind(sapply(derepFs, getN), sapply(derepRs, getN), sapply(dadaFs, getN), sapply(dadaRs, getN))
-samples_to_keep <- track[,4] > 50 #your threshold. try different ones to get the lowest one that will work. #this method accounts for dereplication/ASVs left after inference
+samples_to_keep <- track[,4] > 500 #your threshold. try different ones to get the lowest one that will work. #this method accounts for dereplication/ASVs left after inference
 samples_to_remove <- names(samples_to_keep)[which(samples_to_keep == FALSE)] #record names of samples you have the option of removing
 
 ####merge paired reads####
 mergers <- mergePairs(dadaFs[samples_to_keep], derepFs[samples_to_keep], dadaRs[samples_to_keep], derepRs[samples_to_keep], verbose=TRUE)
+
 # Inspect the merger data.frame from the first sample
 head(mergers[[1]])
 
@@ -166,7 +177,9 @@ dim(seqtab)
 ####View Sequence Length Distribution Post-Merging####
 #most useful with merged data. this plot will not show you much for forward reads only, which should have a uniform length distribution.
 length.histogram <- as.data.frame(table(nchar(getSequences(seqtab)))) #tabulate sequence length distribution
+pdf(paste(PATH,"length_hist.pdf",sep=""))
 plot(x=length.histogram[,1], y=length.histogram[,2]) #view length distribution plot
+dev.off()
 
 ####remove low-count singleton ASVs####
 #create phyloseq otu_table
@@ -217,6 +230,10 @@ rownames(track) <- sample.names[samples_to_keep]
 ####save output from sequnce table construction steps####
 write.table(data.frame("row_names"=rownames(track),track),"read_retention.16s.txt", row.names=FALSE, quote=F, sep="\t")
 write.table(data.frame("row_names"=rownames(seqtab.nosingletons.nochim),seqtab.nosingletons.nochim),"sequence_table.16s.merged.txt", row.names=FALSE, quote=F, sep="\t")
+uniquesToFasta(seqtab.nosingletons.nochim, "rep_set.fa")
+system("awk '/^>/{print \">ASV\" ++i; next}{print}' < rep_set.fa > rep_set_fix.fa")
+
+################Load back into R
 
 #if you must save your sequence table and load it back in before doing taxonomy assignments, here is how to reformat the object so that dada2 will accept it again
 seqtab.nosingletons.nochim <- fread("sequence_table.16s.merged.txt", sep="\t", header=T, colClasses = c("row_names"="character"), data.table=FALSE)
@@ -224,91 +241,56 @@ row.names(seqtab.nosingletons.nochim) <- seqtab.nosingletons.nochim[,1] #set row
 seqtab.nosingletons.nochim <- seqtab.nosingletons.nochim[,-1] #remove column with the row names in it
 seqtab.nosingletons.nochim <- as.matrix(seqtab.nosingletons.nochim) #cast the object as a matrix
 
-####assign taxonomy####
-#note, this takes ages if you have a large dataset. saving the sequences as a fasta file (with writeFasta) and using QIIME's taxonomy assignment command will save you time, and is only slightly less accurate than the dada2 package's taxonomy assignment function.
-taxa <- assignTaxonomy(seqtab.nosingletons.nochim, REFDB, multithread=TRUE)
+# now replace the long ASV names (the actual sequences) with human-readable names, and save the new names and sequences as a .fasta file in your project working directory
+my_otu_table <- t(as.data.frame(seqtab.nosingletons.nochim)) #transposed (OTUs are rows) data frame. unclassing the otu_table() output avoids type/class errors later on
+ASV.seq <- as.character(unclass(row.names(my_otu_table))) #store sequences in character vector
+ASV.num <- paste0("ASV", seq(ASV.seq), sep='') #create new names
+colnames(seqtab.nosingletons.nochim) <- ASV.num #rename your ASVs in the taxonomy table and sequence table objects
 
-#NA taxa are hard to separate later if they have no label. apply "Unassigned" label here now.
-unique(taxa[,1]) #possible labels here: eukaryotic, archaeal, bacterial, and "NA" taxa. 
-NAs <- is.na(taxa[,1]) #test for NA
-NAs <- which(NAs == TRUE) #get indices of NA values
-taxa[NAs,1] <- "Unassigned" #apply new label to identified indices
-colnames(taxa) <- c("Rank1", "Rank2", "Rank3", "Rank4", "Rank5", "Rank6", "Rank7", "Accession")
+##assign taxonomy using vsearch
+##if using usearch instead of vsearch comment out the line below
+system2("alias", args = paste("uclust=", VSEARCH, sep=""))
+setwd(PATH)
+system2("assign_taxonomy.py", args = c("-i rep_set_fix.fa", paste("-t", BACTAX, sep=""), paste("-r", BACREF, sep=""), "-o assigntax", "-m uclust"))
 
-####saving taxonomy data####
-write.table(data.frame("row_names"=rownames(taxa),taxa),paste(PATH,"taxonomy_table.16s.merged.txt") row.names=FALSE, quote=F, sep="\t")
+##now pull unassigned and those without strong bac assignment (no phylum assignment), reassign these with eukaryotic database
+system2("grep", args= "-E 'Unassigned|Bacteria\t' assigntax/rep_set_fix_tax_assignments.txt | awk '{print $1}' > unassigned.ids")
+system2("filter_fasta.py", args= "-f rep_set.fa -o unassigned.fa -s unassigned.ids")
+system2("assign_taxonomy.py", args = c("-i unassigned.fa", paste("-t", EUKTAX, sep=""), paste("-r", EUKREF, sep=""), "-o assigntax", "-m uclust"))
 
 ####combine sequence and taxonomy tables into one####
 #taxa will be the rows, columns will be samples, followed by each rank of taxonomy assignment, from rank1 (domain-level) to rank7/8 (species-level), followed by accession (if applicable)
 #first check if the row names of the taxonomy table match the column headers of the sequence table
+taxa <- read.table("assigntax/rep_set_fix_tax_assignments.txt", header=F, sep="\t", row.names=1)
 length(which(row.names(taxa) %in% colnames(seqtab.nosingletons.nochim)))
 dim(taxa)
 dim(seqtab.nosingletons.nochim)
 #the number of taxa from the last three commands should match
 
 #now ensure that the taxa in the tables are in the same order #this should be true if you haven't reordered one or the other of these matrices inadvertently
+order.col <- row.names(taxa)
+seqtab.nosingletons.nochim <- seqtab.nosingletons.nochim[,order.col]
 row.names(taxa) == colnames(seqtab.nosingletons.nochim) #IMPORTANT: only proceed if this evaluation is true for every element. if it isn't you'll need to re-order your data. I'd suggest sorting both matrices by their rows after transposing the sequence table.
 
 #as long as the ordering of taxa is the same, you can combine like this (note you need to transpose the sequence table so that the taxa are in the rows)
 sequence_taxonomy_table <- cbind(t(seqtab.nosingletons.nochim), taxa)
-colnames(sequence_taxonomy_table) #the last elements of this list should be "Rank1", "Rank2", etc, followed by "Accession"
+colnames(sequence_taxonomy_table)[colnames(sequence_taxonomy_table)=="V2"] <- "taxonomy"
+colnames(sequence_taxonomy_table)[colnames(sequence_taxonomy_table)=="V3"] <- "score"
+colnames(sequence_taxonomy_table)[colnames(sequence_taxonomy_table)=="V4"] <- "count"
 
 #now write to file
 write.table(data.frame("row_names"=rownames(sequence_taxonomy_table),sequence_taxonomy_table),"sequence_taxonomy_table.16s.merged.txt", row.names=FALSE, quote=F, sep="\t")
 
-# now replace the long ASV names (the actual sequences) with human-readable names, and save the new names and sequences as a .fasta file in your project working directory
-my_otu_table <- t(as.data.frame(seqtab.nosingletons.nochim)) #transposed (OTUs are rows) data frame. unclassing the otu_table() output avoids type/class errors later on
-ASV.seq <- as.character(unclass(row.names(my_otu_table))) #store sequences in character vector
-ASV.num <- paste0("ASV", seq(ASV.seq), sep='') #create new names
-write.fasta(sequences=as.list(ASV.seq), names=ASV.num, paste(PATH,"rep_set.fa")) #save sequences with new names in fasta format
-colnames(seqtab.nosingletons.nochim) <- ASV.num #rename your ASVs in the taxonomy table and sequence table objects
-row.names(taxa) <- ASV.num
+#filter out unwanted taxonomic groups
+#system2("grep", args= "-v 'Unassigned' sequence_taxonomy_table.16s.merged.txt | awk '{print $1}' | grep 'A' > wanted.ids")
+wanted <- read.table("wanted.ids", header=F)
+seqtab.filtered <- seqtab.nosingletons.nochim[, which(colnames(seqtab.nosingletons.nochim) %in% wanted$V1)]
 
+#get representative seq tree
+system2("filter_fasta.py -f rep_set_fix.fa -s wanted.ids -o rep_set.filt.fa")
+system2("mafft --auto rep_set.filt.fa > rep_set.filt.align.fa")
+system2("make_phylogeny.py -i rep_set.filt.align.fa -t fasttree -o rep_set.filt.tre")
 
-#### hand off to PhyloSeq ####
-#load sample data
-rawmetadata <- read_delim(file = file.path(PATH, "map.txt"), # file.path() is used for cross-platform compatibility
-                          "\t", # the text file is tab delimited
-                          escape_double = FALSE, # the imported text file does not 'escape' quotation marks by wrapping them with more quotation marks
-                          trim_ws = TRUE) # remove leading and trailing spaces from character string entries
-
-#set row names as the sample IDs for the metadata
-rownames(rawmetadata) <- rawmetadata$SampleID
-
-#record samples absent in either metadata or OTU table
-notinmeta <- setdiff(row.names(seqtab.nosingletons.nochim), rawmetadata$SampleID)
-notinraw <- setdiff(rawmetadata$SampleID, row.names(seqtab.nosingletons.nochim))
-
-#create phyloseq object from "seqtab.nosingletons.nochim", "rawmetadata", and "taxa"
-ps.dada2_join <- phyloseq(otu_table(seqtab.nosingletons.nochim, taxa_are_rows=FALSE), 
-                          sample_data(rawmetadata), 
-                          tax_table(taxa))
-
-# at this point I recommend saving your full unfiltered dataset in phyloseq format as a .RDS, so that you can pick up the analysis from this point easily if you decide to change your filtering criteria later on
-saveRDS(ps.dada2_join, paste(PATH,"full_dataset.phyloseq_format.RDS"))
-                                       
-# Remove samples with less than N reads (N=100 in example. adjust per experiment.)
-ps.dada2_join <- prune_samples(sample_sums(ps.dada2_join) >= 100, ps.dada2_join)
-
-#OPTIONA: Remove OTUs with less than N total reads. (N = 50 for example. adjust per experiment)
-ps.dada2_join <- prune_taxa(taxa_sums(ps.dada2_join) >= 50, ps.dada2_join)
-
-# Set aside unassigned taxa #with dada2, there may not be any unassigned taxa as dada2's RDP classifier usually ends up classifying everything. You may want to adjust this command to set aside ASVs that have no assignment beyond Rank1 instead of no assignment at Rank1.
-ps.dada2_join.unassigned <- ps.dada2_join %>%
-  subset_taxa(Rank1 == "Unassigned")
-# Remove unassigned taxa
-ps.dada2_join <- ps.dada2_join %>%
-  subset_taxa(Rank1 != "Unassigned")
-
-# Remove counts of 1 from OTU table #this is a de-noising method.
-otu <- as.data.frame(otu_table(ps.dada2_join))
-otu_table(ps.dada2_join)[otu <= 1] <- 0
-
-#after denoising you can also remove ASVs that are in groups you wish to exclude (i.e. mammalia, embryophyta, etc.)
-#to do this, just determine which rank the clade is captured by, and filter like so:
-# Remove mitochondrial and chloroplast OTUs
-ps.dada2_join <- ps.dada2_join %>%
-  subset_taxa(Rank4 != "Chloroplast") %>% #you can chain as many of these subset_taxa calls as you like into this single command using the R pipe (%>%)
-  subset_taxa(Rank5 != "Mitochondria")
-
-#with your filtered phyloseq object, you are now ready to move on to whatever statistical/diversity analyses you're planning to do. 
+#OPTIONAL generate Centered Log Ratio Transformed (CLR) dataset for compositional data
+comp <- clr(seqtab.filtered, comp.filt)
+write.table(as.data.frame(comp), "sequence_table.16s.clr.txt", row.names=F, quote=F, sep="\t")

@@ -118,7 +118,8 @@ dev.off()
 ###########################
 #BRAY CURTIS DISSIMILARITY
 ###########################
-bcdist <- vegdist(seqtab.filtered, method="bray")
+seqtab.filtered.rare <- rarefy(seqtab.filtered, 15000)
+bcdist <- vegdist(seqtab.filtered.rare, method="bray")
 hc <- hclust(bcdist, method="complete")
 df2 <- data.frame(cluster=cutree(hc,10), states=factor(hc$labels, levels=hc$labels[hc$order])) # get cluster assocaited with each sample
 hcd <- as.dendrogram(hc)
@@ -131,14 +132,27 @@ gp2<-ggplotGrob(p2)
 maxWidth <- grid::unit.pmax(gp1$widths[2:5], gp2$widths[2:5])
 gp1$widths[2:5] <- as.list(maxWidth)
 gp2$widths[2:5] <- as.list(maxWidth)
-pdf("braycurtis.pdf")
+pdf("figs/braycurtis.pdf")
 grid.arrange(gp1, gp2, ncol=1,heights=c(4/5,1/5,1/5))
 dev.off()
+#pca plot of rarefied data
+pca <- prcomp(bcdist)
+pdf("figs/braycurtis_screeplot.pdf")
+screeplot(pca)
+dev.off()
+pdf("figs/braycurtis_pca_tcruzi.pdf")
+fviz_pca_ind(pca, habillage=merge$MachRes1, geom="point") + labs(title="Bray Curtis Distance")
+dev.off()
+pdf("figs/braycurtis_pca_species.pdf")
+fviz_pca_ind(pca, habillage=merge$Sp_by_key, geom="point") + labs(title="Bray Curtis Distance")
+dev.off()
+
 
 ##########################
 #WEIGHTED UNIFRAC DISTANCE
 ##########################
-wuni <- UniFrac(ps.dada2_join, weighted=T)
+ps.dada2_join.rare <- rarefy_even_depth(ps.dada2_join, sample.size=15000, rngseed=456)
+wuni <- UniFrac(ps.dada2_join.rare, weighted=T)
 hc <- hclust(wuni, method="complete")
 df2 <- data.frame(cluster=cutree(hc,10), states=factor(hc$labels, levels=hc$labels[hc$order])) # get cluster assocaited with each sample
 hcd <- as.dendrogram(hc)
@@ -153,4 +167,23 @@ gp1$widths[2:5] <- as.list(maxWidth)
 gp2$widths[2:5] <- as.list(maxWidth)
 pdf("wunifrac.pdf")
 grid.arrange(gp1, gp2, ncol=1,heights=c(4/5,1/5,1/5))
+dev.off()
+
+#pca plot of rarefied data
+pca <- prcomp(wuni)
+pdf("figs/wunifrac_screeplot.pdf")
+screeplot(pca)
+dev.off()
+pdf("figs/wunifrac_pca_tcruzi.pdf")
+fviz_pca_ind(pca, habillage=merge$MachRes1, geom="point") + labs(title="Weighted Unifrac Distance")
+dev.off()
+pdf("figs/wunifrac_pca_species.pdf")
+fviz_pca_ind(pca, habillage=merge$Sp_by_key, geom="point") + labs(title="Weighted Unifrac Distance")
+dev.off()
+
+########################
+#RAREFACTION CURVE PLOT
+########################
+pdf("figs/rarefaction_curve.pdf")
+rarecurve(seqtab.filtered, label=FALSE)
 dev.off()
