@@ -32,6 +32,7 @@ library(viridis)
 library(ShortRead)
 library(Biostrings)
 library(seqinr)
+library(phyloseq)
 
 ####Environment Setup####
 theme_set(theme_bw())
