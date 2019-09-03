@@ -257,7 +257,7 @@ system("unzip assigntax/classification.qza -d assigntax/")
 
 #get file path for taxonomy file
 tempfile <- dir(path="assigntax/")[1]
-newpath <- paste("assigntax/", tempfile, "/data/taxonomy.tsv", sep="")
+newpath <- paste("assigntax/", tempfile, "/data/taxonomy.tsv", sep="", header=TRUE)
 
 ####combine sequence and taxonomy tables into one####
 #taxa will be the rows, columns will be samples, followed by each rank of taxonomy assignment, from rank1 (domain-level) to rank7/8 (species-level), followed by accession (if applicable)
