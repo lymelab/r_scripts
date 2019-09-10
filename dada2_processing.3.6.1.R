@@ -4,7 +4,7 @@
 #filtering, trimming, etc. Once you've run through the script and are sure everything is up to snuff you can re-run
 #from the terminal using: Rscript dada2.for_16s_dat.R whenever you need to (e.g., you noticed a mistake and you need to reprocess)
 
-#may need to start R in the following way if you encounter vector memory full error -- can also add to bash profile: env R_MAX_VSIZE=700Gb R
+#may need to start R in the following way if you encounter vector memory full error -- can also add to bash profile: env R_MAX_VSIZE=700Gb Rscript dada2_processing.3.6.1.R
 
 ####CHANGE THESE####
 PATH="/home/lymelab/Desktop/dada2test/" #CHANGE ME to your working directory
