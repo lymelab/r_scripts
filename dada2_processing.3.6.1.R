@@ -125,7 +125,7 @@ filtRs <- file.path(path.cut, "filtered", basename(cutRs))
 #filter and trim command. dada2 can canonically handle lots of errors, I am typically permissive in the maxEE parameter set here, in order to retain the maximum number of reads possible. error correction steps built into the dada2 pipeline have no trouble handling data with this many expected errors.
 #check out the DADA2 tutorial to see what each of the options in the command below do
 out <- filterAndTrim(cutFs, filtFs, cutRs, filtRs, trimLeft=5, trimRight=25, minLen = c(150,120),
-                     maxN=c(0,0), maxEE=c(8,10), truncQ=c(2,2), rm.phix=TRUE, matchIDs=TRUE,
+                     maxN=c(0,0), maxEE=c(2,2), truncQ=c(2,2), rm.phix=TRUE, matchIDs=TRUE,
                      compress=TRUE, multithread=TRUE)
 retained <- as.data.frame(out)
 retained$percentage_retained <- retained$reads.out/retained$reads.in*100
