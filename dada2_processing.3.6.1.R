@@ -4,6 +4,8 @@
 #filtering, trimming, etc. Once you've run through the script and are sure everything is up to snuff you can re-run
 #from the terminal using: Rscript dada2.for_16s_dat.R whenever you need to (e.g., you noticed a mistake and you need to reprocess)
 
+#may need to start R in the following way if you encounter vector memory full error -- can also add to bash profile: env R_MAX_VSIZE=700Gb R
+
 ####CHANGE THESE####
 PATH="/home/lymelab/Desktop/dada2test/" #CHANGE ME to your working directory
 RAW="/home/lymelab/Desktop/dada2test" #CHANGE ME to where your raw fastq files are
@@ -257,7 +259,7 @@ system("unzip assigntax/classification.qza -d assigntax/")
 
 #get file path for taxonomy file
 tempfile <- dir(path="assigntax/")[1]
-newpath <- paste("assigntax/", tempfile, "/data/taxonomy.tsv", sep="", header=TRUE)
+newpath <- paste("assigntax/", tempfile, "/data/taxonomy.tsv", sep="")
 
 ####combine sequence and taxonomy tables into one####
 #taxa will be the rows, columns will be samples, followed by each rank of taxonomy assignment, from rank1 (domain-level) to rank7/8 (species-level), followed by accession (if applicable)
