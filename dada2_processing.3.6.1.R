@@ -5,6 +5,8 @@
 #from the terminal using: Rscript dada2.for_16s_dat.R whenever you need to (e.g., you noticed a mistake and you need to reprocess)
 #required packages: QIIME2, mafft, VSEARCH, CutAdapt, SeqTK, fasttree
 
+#may need to start R in the following way if you encounter vector memory full error -- can also add to bash profile: env R_MAX_VSIZE=700Gb Rscript dada2_processing.3.6.1.R
+
 ####CHANGE THESE####
 PATH="/home/lymelab/Desktop/dada2test/" #CHANGE ME to your working directory
 RAW="/home/lymelab/Desktop/dada2test" #CHANGE ME to where your raw fastq files are
@@ -124,7 +126,7 @@ filtRs <- file.path(path.cut, "filtered", basename(cutRs))
 #filter and trim command. dada2 can canonically handle lots of errors, I am typically permissive in the maxEE parameter set here, in order to retain the maximum number of reads possible. error correction steps built into the dada2 pipeline have no trouble handling data with this many expected errors.
 #check out the DADA2 tutorial to see what each of the options in the command below do
 out <- filterAndTrim(cutFs, filtFs, cutRs, filtRs, trimLeft=5, trimRight=25, minLen = c(150,120),
-                     maxN=c(0,0), maxEE=c(8,10), truncQ=c(2,2), rm.phix=TRUE, matchIDs=TRUE,
+                     maxN=c(0,0), maxEE=c(2,2), truncQ=c(2,2), rm.phix=TRUE, matchIDs=TRUE,
                      compress=TRUE, multithread=TRUE)
 retained <- as.data.frame(out)
 retained$percentage_retained <- retained$reads.out/retained$reads.in*100
@@ -257,8 +259,13 @@ system(sprintf("/home/lymelab/miniconda2/envs/qiime2-2019.7/bin/qiime feature-cl
 system("unzip assigntax/classification.qza -d assigntax/")
 
 #get file path for taxonomy file
+<<<<<<< HEAD
 tempfile <- dir(path="assigntax/")[2]
 newpath <- paste("assigntax/", tempfile, "/data/taxonomy.tsv", sep="", header=TRUE)
+=======
+tempfile <- dir(path="assigntax/")[1]
+newpath <- paste("assigntax/", tempfile, "/data/taxonomy.tsv", sep="")
+>>>>>>> 1bab46906ded1cc974200bd75ede29068ed9d0ed
 
 ####combine sequence and taxonomy tables into one####
 #taxa will be the rows, columns will be samples, followed by each rank of taxonomy assignment, from rank1 (domain-level) to rank7/8 (species-level), followed by accession (if applicable)
