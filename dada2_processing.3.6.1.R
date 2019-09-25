@@ -3,6 +3,7 @@
 #there are also points within the protocol where you need to examine some output files to make decisions about quality
 #filtering, trimming, etc. Once you've run through the script and are sure everything is up to snuff you can re-run
 #from the terminal using: Rscript dada2.for_16s_dat.R whenever you need to (e.g., you noticed a mistake and you need to reprocess)
+#required packages: QIIME2, mafft, VSEARCH, CutAdapt, SeqTK, fasttree
 
 ####CHANGE THESE####
 PATH="/home/lymelab/Desktop/dada2test/" #CHANGE ME to your working directory
@@ -256,7 +257,7 @@ system(sprintf("/home/lymelab/miniconda2/envs/qiime2-2019.7/bin/qiime feature-cl
 system("unzip assigntax/classification.qza -d assigntax/")
 
 #get file path for taxonomy file
-tempfile <- dir(path="assigntax/")[1]
+tempfile <- dir(path="assigntax/")[2]
 newpath <- paste("assigntax/", tempfile, "/data/taxonomy.tsv", sep="", header=TRUE)
 
 ####combine sequence and taxonomy tables into one####
