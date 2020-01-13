@@ -259,13 +259,14 @@ system(sprintf("/home/lymelab/miniconda2/envs/qiime2-2019.7/bin/qiime feature-cl
 system("unzip assigntax/classification.qza -d assigntax/")
 
 #get file path for taxonomy file
-<<<<<<< HEAD
-tempfile <- dir(path="assigntax/")[2]
-newpath <- paste("assigntax/", tempfile, "/data/taxonomy.tsv", sep="", header=TRUE)
-=======
-tempfile <- dir(path="assigntax/")[1]
+tempfile <- subset(dir(path="assigntax"), !grepl("classification.qza", dir(path="assigntax/")))
 newpath <- paste("assigntax/", tempfile, "/data/taxonomy.tsv", sep="")
->>>>>>> 1bab46906ded1cc974200bd75ede29068ed9d0ed
+#make 7 level taxonomy file
+system(sprintf("awk '{print $2}' %s | sed '1d' > taxonomy_strings.txt", newpath))
+system(sprintf("awk '{print $1}' %s | sed '1d' > asv_ids.txt", newpath))
+system("python fix_taxonomy_L7.py taxonomy_strings.txt > fix_string.txt") #the script fix_taxonomy_L7.py should be in your working directory
+system("paste asv_ids.txt fix_string.txt > taxonomy_L7.txt")
+system("rm taxonomy_strings.txt fix_string.txt asv_ids.txt")
 
 ####combine sequence and taxonomy tables into one####
 #taxa will be the rows, columns will be samples, followed by each rank of taxonomy assignment, from rank1 (domain-level) to rank7/8 (species-level), followed by accession (if applicable)
