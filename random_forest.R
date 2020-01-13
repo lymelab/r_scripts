@@ -38,7 +38,7 @@ remove_rare <- function( table , cutoff_pro ) {
   return( table [ row2keep , , drop=F ])
 }
 
-otu_table_rare_removed <- remove_rare(table=otu_table, cutoff_pro=0.1)
+otu_table_rare_removed <- remove_rare(table=otu_table, cutoff_pro=0.1) #removes rare ASVs
 otu_table_rare_removed_norm <- sweep(otu_table_rare_removed, 2, colSums(otu_table_rare_removed) , '/')*100
 otu_table_scaled <- scale(otu_table_rare_removed_norm, center = TRUE, scale = TRUE)  
 
